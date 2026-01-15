@@ -4,35 +4,17 @@ import { useState, useEffect } from 'react';
 import { useAccount, useConnect, useDisconnect, useWriteContract, useReadContract } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { SIMPLE_STORAGE_ADDRESS } from '@/src/contracts/address';
+import { SIMPLE_STORAGE_ABI } from '@/src/contracts/abi/SimpleStorage';
 
-// ABI SimpleStorage
-const SIMPLE_STORAGE_ABI = [
-  {
-    inputs: [],
-    name: 'getValue',
-    outputs: [{ type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: '_value', type: 'uint256' }],
-    name: 'setValue',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-];
-
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL;
+console.log(BACKEND);
 
 export default function Page() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-
   const { address, isConnected } = useAccount();
   const { connect, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
-
   const [inputValue, setInputValue] = useState('');
   const [backendValue, setBackendValue] = useState('0');
   const [events, setEvents] = useState<any[]>([]);
@@ -86,34 +68,14 @@ export default function Page() {
     setLoadingEvents(true);
 
     try {
-      // Ambil latest block dari backend
-      const latestRes = await fetch(`${BACKEND}/blockchain/value`);
-      const latestData = await latestRes.json();
-      const latestBlock = BigInt(latestData.latestBlock || 0); // backend bisa dikasih latestBlock endpoint
+      const res = await fetch(`${BACKEND}/blockchain/events`);
+      const json = await res.json();
 
-      const BATCH = 2048n; // maksimal range block per batch
-      let from = 0n; // mulai dari block 0
-      let allEvents: any[] = [];
-
-      while (from <= latestBlock) {
-        const to = from + BATCH - 1n > latestBlock ? latestBlock : from + BATCH - 1n;
-
-        const res = await fetch(`${BACKEND}/blockchain/events`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fromBlock: Number(from), toBlock: Number(to) }),
-        });
-
-        const json = await res.json();
-        if (json && Array.isArray(json.data)) {
-          allEvents.push(...json.data);
-        }
-
-        from = to + 1n; // next batch
+      if (json && Array.isArray(json.data)) {
+        setEvents(json.data.reverse()); // terbaru di atas
+      } else {
+        setEvents([]);
       }
-
-      // paling baru di atas
-      setEvents(allEvents.reverse());
     } catch (e) {
       console.error('Fetch events failed:', e);
       setEvents([]);
@@ -122,11 +84,35 @@ export default function Page() {
     setLoadingEvents(false);
   };
 
+  const refreshEvents = async () => {
+    setLoadingEvents(true);
+
+    try {
+      // trigger backend ambil event dari blockchain
+      await fetch(`${BACKEND}/blockchain/update-events`, {
+        method: 'POST',
+      });
+
+      // tunggu backend selesai
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // ambil event dari json backend
+      await fetchEvents();
+    } catch (e) {
+      console.error('Refresh events failed:', e);
+    }
+
+    setLoadingEvents(false);
+  };
+
+
+
 
   useEffect(() => {
     fetchBackendValue();
     fetchEvents();
   }, []);
+  
 
   if (!mounted) return null;
 
@@ -199,24 +185,50 @@ export default function Page() {
       </div>
 
       {/* EVENTS */}
-      <div className="bg-slate-800 rounded-xl p-6 shadow-lg w-full max-w-2xl flex flex-col space-y-3 mt-4">
-        <h2 className="text-xl font-bold">Contract Events</h2>
+  <div className="bg-slate-800 rounded-xl p-6 shadow-lg w-full max-w-4xl mt-4">
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="text-xl font-bold">Contract Events</h2>
+      <button
+        onClick={refreshEvents}
+        disabled={loadingEvents}
+        className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-sm font-semibold disabled:bg-slate-600"
+      >
+        {loadingEvents ? 'Refreshing…' : 'Refresh Events'}
+      </button>
+    </div>
 
-        {loadingEvents && <p className="text-sm text-slate-400">Loading events…</p>}
+    <div className="max-h-96 overflow-y-auto border border-slate-700 rounded">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-900 sticky top-0">
+          <tr>
+            <th className="p-2 text-left">Block</th>
+            <th className="p-2 text-left">Value</th>
+            <th className="p-2 text-left">Tx Hash</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.length === 0 && !loadingEvents && (
+            <tr>
+              <td colSpan={3} className="p-4 text-center text-slate-400">
+                No events
+              </td>
+            </tr>
+          )}
 
-        {events.length === 0 && !loadingEvents && (
-          <p className="text-sm text-slate-400">No events yet.</p>
-        )}
+          {events.map((e, idx) => (
+            <tr key={idx} className="border-t border-slate-700">
+              <td className="p-2 font-mono">{e.blockNumber}</td>
+              <td className="p-2">{e.value}</td>
+              <td className="p-2 font-mono">
+                {e.txHash.slice(0, 12)}…
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-        {events.map((e, idx) => (
-          <div key={idx} className="border border-slate-700 rounded p-2 flex justify-between">
-            <p className="text-sm">
-              #{e.blockNumber} → {e.value}
-            </p>
-            <p className="text-xs text-slate-400">{e.txHash?.slice(0, 10)}…</p>
-          </div>
-        ))}
-      </div>
     </main>
   );
 }

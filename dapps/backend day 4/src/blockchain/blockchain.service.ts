@@ -7,11 +7,19 @@ import {
 import { createPublicClient, http, PublicClient } from 'viem';
 import { avalancheFuji } from 'viem/chains';
 import SIMPLE_STORAGE from './simple-storage.json';
+import fs from 'fs';
+import path from 'path';
 
 @Injectable()
 export class BlockchainService {
   private client: PublicClient;
   private contractAddress: `0x${string}`;
+  private filePath = path.join(process.cwd(), 'data/events.json');
+
+  // =============================
+  // 🔹 GANTI INI DENGAN BLOCK DEPLOY KONTRAKMU
+  // =============================
+  private FIRST_CONTRACT_BLOCK = 50434269n;
 
   constructor() {
     this.client = createPublicClient({
@@ -19,8 +27,20 @@ export class BlockchainService {
       transport: http(process.env.RPC_URL),
     });
 
-    this.contractAddress =
-      process.env.CONTRACT_ADDRESS as `0x${string}`;
+    this.contractAddress = process.env.CONTRACT_ADDRESS as `0x${string}`;
+
+    // Jika file JSON belum ada, buat default
+    if (!fs.existsSync(this.filePath)) {
+      fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+      fs.writeFileSync(
+        this.filePath,
+        JSON.stringify(
+          { meta: { lastBlock: this.FIRST_CONTRACT_BLOCK - 1n, totalEvents: 0 }, data: [] },
+          null,
+          2,
+        ),
+      );
+    }
   }
 
   // =============================
@@ -41,68 +61,92 @@ export class BlockchainService {
   }
 
   // =============================
-  // 🔹 READ VALUE UPDATED EVENTS (AUTO BATCH UNTUK BLOCK BESAR)
+  // 🔹 UPDATE EVENTS KE FILE JSON (INCREMENTAL)
   // =============================
-  async getValueUpdatedEvents(fromBlock?: number, toBlock?: number) {
+  async updateEvents() {
     try {
       const latestBlock = await this.client.getBlockNumber();
 
-      let from = fromBlock !== undefined ? BigInt(fromBlock) : latestBlock - 50_000n;
-      let to = toBlock !== undefined ? BigInt(toBlock) : latestBlock;
+      // baca file JSON
+      const fileContent = fs.readFileSync(this.filePath, 'utf-8');
+      const json = JSON.parse(fileContent);
 
-      // =============================
-      // ✅ SAFE LIMIT BLOCK
-      // =============================
-      if (from > latestBlock) from = latestBlock;
-      if (to > latestBlock) to = latestBlock;
+      // Mulai dari block terakhir + 1, minimal FIRST_CONTRACT_BLOCK
+      let fromBlock = BigInt(json.meta.lastBlock ?? this.FIRST_CONTRACT_BLOCK - 1n) + 1n;
+      if (fromBlock < this.FIRST_CONTRACT_BLOCK) fromBlock = this.FIRST_CONTRACT_BLOCK;
 
-      if (from > to) {
-        throw new BadRequestException('fromBlock harus <= toBlock (latest block)');
-      }
+      if (fromBlock > latestBlock)
+        return { message: 'Sudah update sampai latest block', totalEvents: json.data.length };
 
-      const MAX_BATCH = 2048n;
-      let allEvents: any[] = [];
-      let currentFrom = from;
+      // batch size aman
+      const BATCH_SIZE = 2048n;
+      let currentFrom = fromBlock;
 
-      while (currentFrom <= to) {
+      while (currentFrom <= latestBlock) {
         const currentTo =
-          currentFrom + MAX_BATCH - 1n > to ? to : currentFrom + MAX_BATCH - 1n;
+          currentFrom + BATCH_SIZE - 1n > latestBlock ? latestBlock : currentFrom + BATCH_SIZE - 1n;
 
-        const events = await this.client.getLogs({
-          address: this.contractAddress,
-          event: {
-            type: 'event',
-            name: 'ValueUpdated',
-            inputs: [{ name: 'newValue', type: 'uint256', indexed: false }],
-          },
-          fromBlock: currentFrom,
-          toBlock: currentTo,
-        });
+        try {
+          const events = await this.client.getLogs({
+            address: this.contractAddress,
+            event: {
+              type: 'event',
+              name: 'ValueUpdated',
+              inputs: [{ name: 'newValue', type: 'uint256', indexed: false }],
+            },
+            fromBlock: currentFrom,
+            toBlock: currentTo,
+          });
 
-        allEvents.push(
-          ...events.map(e => ({
+          const mapped = events.map(e => ({
             blockNumber: e.blockNumber?.toString(),
             value: e.args.newValue?.toString(),
             txHash: e.transactionHash,
-          }))
-        );
+          }));
 
-        currentFrom = currentTo + 1n;
+          if (mapped.length > 0) {
+            json.data.push(...mapped);
+          }
+
+          console.log(`Fetched events from ${currentFrom} to ${currentTo} (batch ${BATCH_SIZE})`);
+
+          // update meta dan simpan ke file setiap batch
+          json.meta.lastBlock = Number(currentTo);
+          json.meta.totalEvents = json.data.length;
+          fs.writeFileSync(this.filePath, JSON.stringify(json, null, 2));
+
+          currentFrom = currentTo + 1n;
+        } catch (e) {
+          console.warn(`Batch ${BATCH_SIZE} gagal di ${currentFrom} → ${currentTo}. Coba batch lebih kecil nanti.`);
+          throw new ServiceUnavailableException(
+            'RPC tidak bisa menangani batch saat ini. Coba range lebih kecil.',
+          );
+        }
       }
 
       return {
-        meta: {
-          fromBlock: from.toString(),
-          toBlock: to.toString(),
-          totalEvents: allEvents.length,
-        },
-        data: allEvents.reverse(),
+        message: `Update selesai sampai block ${latestBlock}`,
+        totalEvents: json.data.length,
       };
     } catch (error) {
-      this.handleRpcError(error);
+      console.error(error);
+      throw new InternalServerErrorException('Gagal update events');
     }
   }
 
+  // =============================
+  // 🔹 GET EVENTS DARI FILE JSON
+  // =============================
+  getEventsFromFile() {
+    try {
+      const fileContent = fs.readFileSync(this.filePath, 'utf-8');
+      const json = JSON.parse(fileContent);
+      return { ...json, data: json.data.slice().reverse() }; // paling baru di atas
+    } catch (error) {
+      console.error(error);
+      throw new InternalServerErrorException('Gagal baca events');
+    }
+  }
 
   // =============================
   // 🔹 RPC ERROR HANDLER
@@ -116,7 +160,11 @@ export class BlockchainService {
       throw new ServiceUnavailableException('RPC timeout. Silakan coba lagi.');
     }
 
-    if (message.includes('network') || message.includes('fetch') || message.includes('failed')) {
+    if (
+      message.includes('network') ||
+      message.includes('fetch') ||
+      message.includes('failed')
+    ) {
       throw new ServiceUnavailableException('Gagal terhubung ke blockchain RPC.');
     }
 
