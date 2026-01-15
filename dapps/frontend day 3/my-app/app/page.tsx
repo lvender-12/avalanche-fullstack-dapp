@@ -119,6 +119,8 @@ export default function Page() {
   return (
     <main className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-start p-6 space-y-6">
       <h1 className="text-2xl font-bold mb-4">Day 3 – Full Stack dApp</h1>
+      <h1 className="text-2xl font-bold mb-4">muhammad nur jagat arya damar</h1>
+      <h1 className="text-2xl font-bold mb-4">241011400372</h1>
 
       <div className="flex flex-wrap gap-4 w-full justify-center">
 
