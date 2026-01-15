@@ -6,15 +6,29 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: '*',
+    methods: ['GET', 'POST'],
+  });
+
   const config = new DocumentBuilder()
     .setTitle('Simple Storage dApp API')
-    .setDescription('The Simple Storage dApp API description')
+    .setDescription(
+      'The Simple Storage dApp API description<br><br>' +
+      '👤 Nama: Muhammad nur jagat arya damarLvender<br>' +
+      '🆔 NIM: 241011400372'
+    )
+
     .setVersion('1.0')
     .addTag('simple-storage')
     .build();
 
-  const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('documentation', app, documentFactory);
+  const document = SwaggerModule.createDocument(app, config);
+
+  // Swagger di /documentation
+  SwaggerModule.setup('documentation', app, document, {
+    customSiteTitle: 'Simple Storage dApp Swagger', // title di tab browser
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

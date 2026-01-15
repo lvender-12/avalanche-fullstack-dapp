@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.17",
+    "@wagmi/connectors": "^7.1.2",
     "@walletconnect/ethereum-provider": "^2.23.2",
     "next": "16.1.1",
     "react": "19.2.3",

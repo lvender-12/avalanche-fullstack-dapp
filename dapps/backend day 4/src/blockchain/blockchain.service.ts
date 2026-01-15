@@ -41,69 +41,68 @@ export class BlockchainService {
   }
 
   // =============================
-  // 🔹 READ VALUE UPDATED EVENTS
+  // 🔹 READ VALUE UPDATED EVENTS (AUTO BATCH UNTUK BLOCK BESAR)
   // =============================
-  async getValueUpdatedEvents(
-    fromBlock?: number,
-    toBlock?: number,
-  ) {
+  async getValueUpdatedEvents(fromBlock?: number, toBlock?: number) {
     try {
       const latestBlock = await this.client.getBlockNumber();
 
-      // Default: 500 block terakhir
-      const from = fromBlock
-        ? BigInt(fromBlock)
-        : latestBlock - 500n;
+      let from = fromBlock !== undefined ? BigInt(fromBlock) : latestBlock - 50_000n;
+      let to = toBlock !== undefined ? BigInt(toBlock) : latestBlock;
 
-      const to = toBlock
-        ? BigInt(toBlock)
-        : latestBlock;
+      // =============================
+      // ✅ SAFE LIMIT BLOCK
+      // =============================
+      if (from > latestBlock) from = latestBlock;
+      if (to > latestBlock) to = latestBlock;
 
       if (from > to) {
-        throw new BadRequestException(
-          'fromBlock harus lebih kecil dari toBlock',
-        );
+        throw new BadRequestException('fromBlock harus <= toBlock (latest block)');
       }
 
-      if (to - from > 2048n) {
-        throw new BadRequestException(
-          'Range block terlalu besar (maksimal 2048 block)',
-        );
-      }
+      const MAX_BATCH = 2048n;
+      let allEvents: any[] = [];
+      let currentFrom = from;
 
-      const events = await this.client.getLogs({
-        address: this.contractAddress,
-        event: {
-          type: 'event',
-          name: 'ValueUpdated',
-          inputs: [
-            {
-              name: 'newValue',
-              type: 'uint256',
-              indexed: false,
-            },
-          ],
-        },
-        fromBlock: from,
-        toBlock: to,
-      });
+      while (currentFrom <= to) {
+        const currentTo =
+          currentFrom + MAX_BATCH - 1n > to ? to : currentFrom + MAX_BATCH - 1n;
+
+        const events = await this.client.getLogs({
+          address: this.contractAddress,
+          event: {
+            type: 'event',
+            name: 'ValueUpdated',
+            inputs: [{ name: 'newValue', type: 'uint256', indexed: false }],
+          },
+          fromBlock: currentFrom,
+          toBlock: currentTo,
+        });
+
+        allEvents.push(
+          ...events.map(e => ({
+            blockNumber: e.blockNumber?.toString(),
+            value: e.args.newValue?.toString(),
+            txHash: e.transactionHash,
+          }))
+        );
+
+        currentFrom = currentTo + 1n;
+      }
 
       return {
         meta: {
           fromBlock: from.toString(),
           toBlock: to.toString(),
-          totalEvents: events.length,
+          totalEvents: allEvents.length,
         },
-        data: events.map((event) => ({
-          blockNumber: event.blockNumber?.toString(),
-          value: event.args.newValue?.toString(),
-          txHash: event.transactionHash,
-        })),
+        data: allEvents.reverse(),
       };
     } catch (error) {
       this.handleRpcError(error);
     }
   }
+
 
   // =============================
   // 🔹 RPC ERROR HANDLER
@@ -114,23 +113,13 @@ export class BlockchainService {
     console.error('Blockchain error:', message);
 
     if (message.includes('timeout')) {
-      throw new ServiceUnavailableException(
-        'RPC timeout. Silakan coba lagi.',
-      );
+      throw new ServiceUnavailableException('RPC timeout. Silakan coba lagi.');
     }
 
-    if (
-      message.includes('network') ||
-      message.includes('fetch') ||
-      message.includes('failed')
-    ) {
-      throw new ServiceUnavailableException(
-        'Gagal terhubung ke blockchain RPC.',
-      );
+    if (message.includes('network') || message.includes('fetch') || message.includes('failed')) {
+      throw new ServiceUnavailableException('Gagal terhubung ke blockchain RPC.');
     }
 
-    throw new InternalServerErrorException(
-      'Terjadi kesalahan saat membaca data blockchain.',
-    );
+    throw new InternalServerErrorException('Terjadi kesalahan saat membaca data blockchain.');
   }
 }
