@@ -42,6 +42,7 @@ const RAW_RUNTIME_STATE =
           ["@types/node", "npm:22.19.6"],\
           ["@types/supertest", "npm:6.0.3"],\
           ["backend day 4", "workspace:."],\
+          ["dotenv", "npm:17.2.3"],\
           ["eslint", "virtual:251ccbf66c1cd33ad2e3b7841d675fbef3d65aced94dcc1fad11cfd71e33c3be75ec8733dfb854f87e7fe399d3421e3308af1d336a9d9cbd44a6d2bbbb407875#npm:9.39.2"],\
           ["eslint-config-prettier", "virtual:251ccbf66c1cd33ad2e3b7841d675fbef3d65aced94dcc1fad11cfd71e33c3be75ec8733dfb854f87e7fe399d3421e3308af1d336a9d9cbd44a6d2bbbb407875#npm:10.1.8"],\
           ["eslint-plugin-prettier", "virtual:251ccbf66c1cd33ad2e3b7841d675fbef3d65aced94dcc1fad11cfd71e33c3be75ec8733dfb854f87e7fe399d3421e3308af1d336a9d9cbd44a6d2bbbb407875#npm:5.5.5"],\
@@ -4359,6 +4360,7 @@ const RAW_RUNTIME_STATE =
           ["@types/node", "npm:22.19.6"],\
           ["@types/supertest", "npm:6.0.3"],\
           ["backend day 4", "workspace:."],\
+          ["dotenv", "npm:17.2.3"],\
           ["eslint", "virtual:251ccbf66c1cd33ad2e3b7841d675fbef3d65aced94dcc1fad11cfd71e33c3be75ec8733dfb854f87e7fe399d3421e3308af1d336a9d9cbd44a6d2bbbb407875#npm:9.39.2"],\
           ["eslint-config-prettier", "virtual:251ccbf66c1cd33ad2e3b7841d675fbef3d65aced94dcc1fad11cfd71e33c3be75ec8733dfb854f87e7fe399d3421e3308af1d336a9d9cbd44a6d2bbbb407875#npm:10.1.8"],\
           ["eslint-plugin-prettier", "virtual:251ccbf66c1cd33ad2e3b7841d675fbef3d65aced94dcc1fad11cfd71e33c3be75ec8733dfb854f87e7fe399d3421e3308af1d336a9d9cbd44a6d2bbbb407875#npm:5.5.5"],\
@@ -5102,6 +5104,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../../../C:/Users/Damar/AppData/Local/Yarn/Berry/cache/diff-npm-4.0.2-73133c7102-10c0.zip/node_modules/diff/",\
         "packageDependencies": [\
           ["diff", "npm:4.0.2"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["dotenv", [\
+      ["npm:17.2.3", {\
+        "packageLocation": "../../../../../C:/Users/Damar/AppData/Local/Yarn/Berry/cache/dotenv-npm-17.2.3-2f9ab93ea1-10c0.zip/node_modules/dotenv/",\
+        "packageDependencies": [\
+          ["dotenv", "npm:17.2.3"]\
         ],\
         "linkType": "HARD"\
       }]\

@@ -16,11 +16,11 @@ export class BlockchainService {
   constructor() {
     this.client = createPublicClient({
       chain: avalancheFuji,
-      transport: http('https://api.avax-test.network/ext/bc/C/rpc'),
+      transport: http(process.env.RPC_URL),
     });
 
     this.contractAddress =
-      '0x25F0B33C6A83eA7ee53f24a6c2871c50899B5ab2' as `0x${string}`;
+      process.env.CONTRACT_ADDRESS as `0x${string}`;
   }
 
   // =============================
