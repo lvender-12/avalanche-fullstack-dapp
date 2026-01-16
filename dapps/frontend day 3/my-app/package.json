@@ -5,13 +5,14 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "eslint"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.17",
     "@wagmi/connectors": "^7.1.2",
     "@walletconnect/ethereum-provider": "^2.23.2",
+    "cross-env": "^10.1.0",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
