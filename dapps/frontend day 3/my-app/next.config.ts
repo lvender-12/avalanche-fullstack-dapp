@@ -1,10 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    turbo: {
-      root: __dirname, // pakai root folder project
-    },
+  turbopack: {
+    root: __dirname,
   },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
